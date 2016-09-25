@@ -56,6 +56,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		AppendMenu(hPopupMenu2, MF_STRING, 1007, L"Rectangle");
 		AppendMenu(hPopupMenu2, MF_STRING, 1008, L"Ellipse");
 		AppendMenu(hPopupMenu2, MF_STRING, 1009, L"Curve");
+		AppendMenu(hPopupMenu2, MF_STRING, 1010, L"Curve");
 	}
 	AppendMenu(MainMenu, MF_STRING, 0, L"About");
 
@@ -156,6 +157,35 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				case 1000:
 				{
 
+					break;
+				}
+				case 1001:
+				{
+					hdc = GetDC(hwnd);
+					
+					RECT rect;
+					GetClientRect(hwnd, &rect);
+					int iWidthMM = GetDeviceCaps(hdc, HORZSIZE);
+					int iHeightMM = GetDeviceCaps(hdc, VERTSIZE);
+					int iWidthPels = GetDeviceCaps(hdc, HORZRES);
+					int iHeightPels = GetDeviceCaps(hdc, VERTRES);
+					rect.left = (rect.left * iWidthMM * 100) / iWidthPels;
+					rect.top = (rect.top * iHeightMM * 100) / iHeightPels;
+					rect.right = (rect.right * iWidthMM * 100) / iWidthPels;
+					rect.bottom = (rect.bottom * iHeightMM * 100) / iHeightPels;
+					HDC hdcMeta = CreateEnhMetaFile(hdc, L"D:\\testEMF.emf", &rect, L"Example metafile\0");
+					if (!hdcMeta)
+					{
+
+						MessageBox(NULL, L"CreateEnhMetaFile!", L"Error", MB_ICONERROR);
+					}
+					StretchBlt(hdcMeta, 0, 0, GetDeviceCaps(hdc, HORZRES),
+						GetDeviceCaps(hdc, VERTRES), memDC, 0, 0,
+						GetDeviceCaps(memDC, HORZRES), GetDeviceCaps(memDC, VERTRES), SRCCOPY);
+					SetMapMode(hdcMeta, MM_ANISOTROPIC);
+					ReleaseDC(hwnd, hdc);
+					HENHMETAFILE meta = CloseEnhMetaFile(hdcMeta);
+					//ReleaseDC(hwnd, hdcMeta);
 					break;
 				}
 				case 1005:
