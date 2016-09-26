@@ -1,9 +1,8 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
-#include <iostream>
 #include "Painter.h"
+#include "resource.h"
 
-#define SelectPen(hdc, hpen) \
-  ((HPEN)SelectObject((hdc), (HGDIOBJ)(HPEN)(hpen)))
 
 #define ID_OPEN_FILE 1000
 #define ID_SAVE_FILE 1001
@@ -17,47 +16,55 @@
 #define ID_CURVE 1009
 #define ID_POLY 1010
 #define ID_TEXT 1011
-#define ID_ABOUT 1
+#define ID_ABOUT 100
+#define ID_COLOR_LINE 101
+#define ID_COLOR_FILL 102
+#define ID_NO_COLOR_FILL 103
+#define ID_LINE_1px 1
+#define ID_LINE_3px 3
+#define ID_LINE_7px 7
+#define ID_LINE_10px 10
 
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 int currentId = 0;
-bool flag = FALSE, flagPoly = FALSE, firstLine = TRUE;
-LPWSTR openFileName;
+bool flag = FALSE, flagPoly = FALSE, firstLine = TRUE, isFill = FALSE, isPrint = FALSE;
+LPCWSTR openFileName;
 double zoom = 1;
 Painter painter;
 POINTS startPointPoly;
+COLORREF color = RGB(0, 0, 0), colorFill;
+int penWidth = 1;
+HPEN hPen;
+HBRUSH hBrush;
+HFONT hfont;
+HINSTANCE hInst;
 char text[2] = { ' ', '\0' };
 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
-	// Регистрация класса окна
-	// Объявляем переменную типа WNDCLASSEX
-
 	WNDCLASSEX wClass;
-	ZeroMemory(&wClass, sizeof(WNDCLASSEX)); // Обнуляем память
+	ZeroMemory(&wClass, sizeof(WNDCLASSEX)); 
 
-											 // Заполняем структуру WNDCLASSEX
-	wClass.cbSize = sizeof(WNDCLASSEX); // Размер равен размеру структуры
-	wClass.hbrBackground = (HBRUSH)(COLOR_WINDOW +1); // Определяем фон окна
-	wClass.hInstance = hInstance; // hInstance window
-	wClass.lpfnWndProc = (WNDPROC)WndProc; // Процедура обработки окна
-	wClass.lpszClassName = L"My Window Class"; // Имя класса
+	wClass.cbSize = sizeof(WNDCLASSEX); 
+	wClass.hbrBackground = (HBRUSH)(COLOR_WINDOW +1);
+	wClass.hInstance = hInstance;
+	wClass.lpfnWndProc = (WNDPROC)WndProc; 
+	wClass.lpszClassName = L"My Window Class";
 	wClass.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wClass.style = CS_HREDRAW | CS_VREDRAW;
 
-
-	// Если произошла ошибка, то выводим сообщение
 	if (!RegisterClassEx(&wClass))
 	{
 		int nResult = GetLastError();
 		MessageBox(NULL, L"Класс окна не был создан!", L"Ошибка", MB_ICONERROR);
 	}
-
+	hInst = hInstance;
 	HMENU MainMenu = CreateMenu();
 	HMENU hPopupMenu1 = CreatePopupMenu();
 	HMENU hPopupMenu2 = CreatePopupMenu();
+	HMENU hPopupMenu3 = CreatePopupMenu();
 
 	AppendMenu(MainMenu, MF_STRING | MF_POPUP, (UINT)hPopupMenu1, L"File");
 	{
@@ -77,12 +84,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		AppendMenu(hPopupMenu2, MF_STRING, ID_POLY, L"Poly");
 		AppendMenu(hPopupMenu2, MF_STRING, ID_TEXT, L"Text");
 	}
+	AppendMenu(MainMenu, MF_STRING | MF_POPUP, (UINT)hPopupMenu3, L"Thickness");
+	{
+		AppendMenu(hPopupMenu3, MF_STRING, ID_LINE_1px, L"1px");
+		AppendMenu(hPopupMenu3, MF_STRING, ID_LINE_3px, L"3px");
+		AppendMenu(hPopupMenu3, MF_STRING, ID_LINE_7px, L"7px");
+		AppendMenu(hPopupMenu3, MF_STRING, ID_LINE_10px, L"10px");
+	}
+	AppendMenu(MainMenu, MF_STRING, ID_COLOR_LINE, L"Line color");
+	AppendMenu(MainMenu, MF_STRING, ID_COLOR_FILL, L"Fill color");
+	AppendMenu(MainMenu, MF_STRING, ID_NO_COLOR_FILL, L"No fill color");
 	AppendMenu(MainMenu, MF_STRING, ID_ABOUT, L"About");
 
 	HWND hWindow = CreateWindowEx(NULL,
 		L"My Window Class", 
 		L"Mini Paint", 
-		WS_OVERLAPPEDWINDOW,
+		WS_OVERLAPPEDWINDOW | WS_HSCROLL | WS_VSCROLL,
 		500, 
 		250, 
 		640, 
@@ -91,10 +108,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		MainMenu,
 		hInstance, 
 		NULL);
-	/*RECT rect;
-	GetClientRect(hWindow, &rect);
-	HWND s1 = CreateWindowEx(0, L"SCROLLBAR", NULL, WS_CHILD | WS_VISIBLE | SBS_VERT, rect.right-15, 0, 15, rect.bottom, hWindow, NULL, hInstance, NULL);
-	HWND s2 = CreateWindowEx(0, L"SCROLLBAR", NULL, WS_CHILD | WS_VISIBLE | SBS_HORZ, 0, rect.bottom-15, rect.right-15, 15, hWindow, NULL, hInstance, NULL);*/
+
+	painter.hideScrollBar(hWindow);
 
 	if (!hWindow)
 	{
@@ -118,25 +133,44 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	return 0;
 }
 
-
-int CALLBACK EnhMetaFileProc(HDC hdc, HANDLETABLE *pHandleTable, CONST ENHMETARECORD *pEMFRecord, int iHandles, LPARAM pData)
+void OnDropFiles(HWND hWnd, HDROP hDrop)
 {
-	if (pEMFRecord->iType != EMR_HEADER && pEMFRecord->iType != EMR_EOF)
+	TCHAR szFileName[MAX_PATH];
+	DWORD dwCount = DragQueryFile(hDrop, 0xFFFFFFFF, szFileName, MAX_PATH);
+	for (int i = 0; i < dwCount; i++)
 	{
-		PlayEnhMetaFileRecord(hdc, pHandleTable, pEMFRecord, iHandles);
+		DragQueryFile(hDrop, i, szFileName, MAX_PATH);
+		MessageBox(NULL, szFileName, NULL, 0);
+	}
+	DragFinish(hDrop);
+}
+
+INT_PTR CALLBACK AboutProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+	switch (uMsg)
+	{
+	case WM_INITDIALOG:
+	{
+		return (INT_PTR)TRUE;
+	}
+	case WM_COMMAND:
+		switch (LOWORD(wParam))
+		{
+		default:
+		{
+			EndDialog(hwnd, LOWORD(wParam));
+			return (INT_PTR)TRUE;
+		}
+		break;
+		}
 	}
 
-	return TRUE;
+	return (INT_PTR)FALSE;
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	/*PAINTSTRUCT paint;
-	POINTS ptsBegin = MAKEPOINTS(lParam), ptsEnd = MAKEPOINTS(lParam);
-	HDC hdc = GetDC(hwnd);
-	double zoom = 1;
-	HDC memDC = CreateCompatibleDC(hdc);*/
-
 	PAINTSTRUCT ps;
 	static HDC hdc;		
 	static POINTS ptsBegin;		
@@ -145,21 +179,27 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	static int k = 0;
 	static HDC memDC;
 	static HBITMAP memBM;
-	/*static HDC memDC = CreateCompatibleDC(hdc);
-	static HBITMAP memBM = CreateCompatibleBitmap(hdc, GetDeviceCaps(hdc, HORZRES),
-		GetDeviceCaps(hdc, VERTRES));
-	if (k == 0)
-	{
-		SelectObject(memDC, memBM);
-		PatBlt(memDC, 0, 0, GetDeviceCaps(hdc, HORZRES), GetDeviceCaps(hdc, VERTRES), WHITENESS);
-		k++;
-	}
-	ReleaseDC(hwnd, hdc);*/
+
 	switch (uMsg)
 	{
 		case WM_CREATE:
 		{
 			hdc = GetDC(hwnd);
+			hPen = CreatePen(PS_SOLID, 1, RGB(0, 0, 0));
+			DragAcceptFiles(hwnd, TRUE);
+			LOGFONT font;
+			font.lfHeight = 12;
+			font.lfWidth = 5;
+			font.lfEscapement = 0;
+			font.lfOrientation = 0;
+			font.lfWeight = 100;
+			font.lfCharSet = RUSSIAN_CHARSET;
+			font.lfOutPrecision = 0;
+			font.lfClipPrecision = 0;
+			font.lfQuality = 100;
+			font.lfPitchAndFamily = 5;
+
+			hfont = CreateFontIndirect(&font);
 			k = 0;
 			memDC = CreateCompatibleDC(hdc);
 			memBM = CreateCompatibleBitmap(hdc, GetDeviceCaps(hdc, HORZRES),
@@ -170,8 +210,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				PatBlt(memDC, 0, 0, GetDeviceCaps(hdc, HORZRES), GetDeviceCaps(hdc, VERTRES), WHITENESS);
 				k++;
 			}
+			SelectObject(memDC, hPen);
 			ReleaseDC(hwnd, hdc);
-			// Здесь будем создавать элементы управления окна
 			break;
 		}
 
@@ -181,22 +221,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			{
 				case ID_ABOUT:
 				{
-					MessageBox(hwnd, L"Mini Paint\nAlexandr Chuiko\n2016", L"About", MB_OK);
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG1), hwnd, AboutProc);
 					break;
 				}
 				case ID_SAVE_AS_FILE:
 				{
-					OPENFILENAME ofn;       // common dialog box structure
-					char szFile[260];       // buffer for file name
-					HANDLE hf;              // file handle
+					OPENFILENAME ofn;       
+					char szFile[260];       
 
-											// Initialize OPENFILENAME
 					ZeroMemory(&ofn, sizeof(ofn));
 					ofn.lStructSize = sizeof(ofn);
 					ofn.hwndOwner = hwnd;
 					ofn.lpstrFile = (LPWSTR)szFile;
-					// Set lpstrFile[0] to '\0' so that GetOpenFileName does not 
-					// use the contents of szFile to initialize itself.
 					ofn.lpstrFile[0] = '\0';
 					ofn.nMaxFile = sizeof(szFile);
 					ofn.lpstrFilter = L"EMF\0*.emf\0";
@@ -206,7 +242,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					ofn.lpstrInitialDir = NULL;
 					ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
-					// Display the Open dialog box. 
 
 					if (GetSaveFileName(&ofn) == TRUE)
 					{
@@ -233,6 +268,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						SetMapMode(hdcMeta, MM_ANISOTROPIC);
 						ReleaseDC(hwnd, hdc);
 						HENHMETAFILE meta = CloseEnhMetaFile(hdcMeta);
+						DeleteEnhMetaFile(meta);
 						ReleaseDC(hwnd, hdcMeta);
 					}
 					break;
@@ -240,17 +276,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				case ID_OPEN_FILE:
 				{
 					hdc = GetDC(hwnd);
-					OPENFILENAME ofn;       // common dialog box structure
-					char szFile[260];       // buffer for file name
-					HANDLE hf;              // file handle
+					OPENFILENAME ofn;       
+					char szFile[260];       
 
-											// Initialize OPENFILENAME
 					ZeroMemory(&ofn, sizeof(ofn));
 					ofn.lStructSize = sizeof(ofn);
 					ofn.hwndOwner = hwnd;
 					ofn.lpstrFile = (LPWSTR)szFile;
-					// Set lpstrFile[0] to '\0' so that GetOpenFileName does not 
-					// use the contents of szFile to initialize itself.
 					ofn.lpstrFile[0] = '\0';
 					ofn.nMaxFile = sizeof(szFile);
 					ofn.lpstrFilter = L"EMF\0*.emf\0";
@@ -260,23 +292,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					ofn.lpstrInitialDir = NULL;
 					ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
-					// Display the Open dialog box. 
 
 					if (GetOpenFileName(&ofn) == TRUE)
 					{
-						/*hf = CreateFile(ofn.lpstrFile,
-							GENERIC_READ,
-							0,
-							(LPSECURITY_ATTRIBUTES)NULL,
-							OPEN_EXISTING,
-							FILE_ATTRIBUTE_NORMAL,
-							(HANDLE)NULL);*/
 						openFileName = ofn.lpstrFile;
+						//openFileName = ofn.lpstrFile;
 						HENHMETAFILE hemf = GetEnhMetaFile(ofn.lpstrFile);
 						RECT rect;
 						GetClientRect(hwnd, &rect);
 						PlayEnhMetaFile(hdc, hemf, &rect);
-						//EnumEnhMetaFile(hdc, hemf, EnhMetaFileProc, NULL, &rect);
 						StretchBlt(memDC, 0, 0, GetDeviceCaps(hdc, HORZRES),
 							GetDeviceCaps(hdc, VERTRES), hdc, 0, 0,
 							GetDeviceCaps(memDC, HORZRES), GetDeviceCaps(memDC, VERTRES), SRCCOPY);
@@ -288,9 +312,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				case ID_SAVE_FILE:
 				{
 					hdc = GetDC(hwnd);
-					
+
 					RECT rect;
 					GetClientRect(hwnd, &rect);
+	
 					int iWidthMM = GetDeviceCaps(hdc, HORZSIZE);
 					int iHeightMM = GetDeviceCaps(hdc, VERTSIZE);
 					int iWidthPels = GetDeviceCaps(hdc, HORZRES);
@@ -299,6 +324,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					rect.top = (rect.top * iHeightMM * 100) / iHeightPels;
 					rect.right = (rect.right * iWidthMM * 100) / iWidthPels;
 					rect.bottom = (rect.bottom * iHeightMM * 100) / iHeightPels;
+					
 					HDC hdcMeta = CreateEnhMetaFile(hdc, openFileName, &rect, L"Example metafile\0");
 					if (!hdcMeta)
 					{
@@ -310,7 +336,71 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					SetMapMode(hdcMeta, MM_ANISOTROPIC);
 					ReleaseDC(hwnd, hdc);
 					HENHMETAFILE meta = CloseEnhMetaFile(hdcMeta);
+					DeleteEnhMetaFile(meta);
 					ReleaseDC(hwnd, hdcMeta);
+					break;
+				}
+				case ID_PRINT_FILE:
+				{
+					if (!isPrint)
+					{
+						currentId = ID_RECT;
+						isPrint = TRUE;
+					}
+					else
+					{
+						OPENFILENAME ofn;
+						char szFile[260];
+
+						ZeroMemory(&ofn, sizeof(ofn));
+						ofn.lStructSize = sizeof(ofn);
+						ofn.hwndOwner = hwnd;
+						ofn.lpstrFile = (LPWSTR)szFile;
+						ofn.lpstrFile[0] = '\0';
+						ofn.nMaxFile = sizeof(szFile);
+						ofn.lpstrFilter = L"EMF\0*.emf\0";
+						ofn.nFilterIndex = 1;
+						ofn.lpstrFileTitle = NULL;
+						ofn.nMaxFileTitle = 0;
+						ofn.lpstrInitialDir = NULL;
+						ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+
+						if (GetSaveFileName(&ofn) == TRUE)
+						{
+							hdc = GetDC(hwnd);
+
+							RECT rect;
+							GetClientRect(hwnd, &rect);
+							int iWidthMM = GetDeviceCaps(hdc, HORZSIZE);
+							int iHeightMM = GetDeviceCaps(hdc, VERTSIZE);
+							int iWidthPels = GetDeviceCaps(hdc, HORZRES);
+							int iHeightPels = GetDeviceCaps(hdc, VERTRES);
+							rect.left = (0 * iWidthMM * 100) / iWidthPels;
+							rect.top = (0 * iHeightMM * 100) / iHeightPels;
+							rect.right = (abs(ptsEnd.x - ptsBegin.x) * iWidthMM * 100) / iWidthPels;
+							rect.bottom = (abs(ptsEnd.y - ptsBegin.y) * iHeightMM * 100) / iHeightPels;
+							/*rect.left = 0;
+							rect.top = 0;
+							rect.bottom = abs(ptsEnd.y - ptsBegin.y);
+							rect.right = abs(ptsEnd.x - ptsBegin.x);*/
+							HDC hdcMeta = CreateEnhMetaFile(hdc, ofn.lpstrFile, &rect, L"Example metafile\0");
+							if (!hdcMeta)
+							{
+								MessageBox(NULL, L"CreateEnhMetaFile!", L"Error", MB_ICONERROR);
+							}
+							StretchBlt(hdcMeta, 0, 0, abs(ptsEnd.x - ptsBegin.x),
+								abs(ptsEnd.y - ptsBegin.y), memDC, ptsBegin.x, ptsBegin.y,
+								abs(ptsEnd.x - ptsBegin.x), abs(ptsEnd.y - ptsBegin.y), SRCCOPY);
+							SetMapMode(hdcMeta, MM_ANISOTROPIC);
+							ReleaseDC(hwnd, hdc);
+							HENHMETAFILE meta = CloseEnhMetaFile(hdcMeta);
+							DeleteEnhMetaFile(meta);
+							ReleaseDC(hwnd, hdcMeta);
+							currentId = 0;
+							isPrint = FALSE;
+						}
+					}
 					break;
 				}
 				case ID_PENCIL:
@@ -349,7 +439,65 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					currentId = ID_TEXT;
 					break;
 				}
-			// Обработка команд (нажатие кнопок, мыши, полей ввода и т.д.)
+				case ID_LINE_1px:
+				{
+					penWidth = 1;
+					hPen = CreatePen(PS_SOLID, 1, color);
+					break;
+				}
+				case ID_LINE_3px:
+				{
+					penWidth = 3;
+					hPen = CreatePen(PS_SOLID, 3, color);
+					break;
+				}
+				case ID_LINE_7px:
+				{
+					penWidth = 7;
+					hPen = CreatePen(PS_SOLID, 7, color);
+					break;
+				}
+				case ID_LINE_10px:
+				{
+					penWidth = 10;
+					hPen = CreatePen(PS_SOLID, 10, color);
+					break;
+				}
+				case ID_COLOR_LINE:
+				{
+					CHOOSECOLOR cc = { 0 };
+					cc.hwndOwner = hwnd;
+					cc.lStructSize = sizeof(cc);
+					COLORREF cust_colors[16] = { 0 };
+					cc.lpCustColors = cust_colors;
+
+					if (ChooseColor(&cc)) {
+						color = cc.rgbResult;
+						hPen = CreatePen(PS_SOLID, penWidth, color);
+					}
+					break;
+				}
+				case ID_NO_COLOR_FILL:
+				{
+					isFill = FALSE;
+					break;
+				}
+				case ID_COLOR_FILL:
+				{
+					CHOOSECOLOR cc = { 0 };
+					cc.hwndOwner = hwnd;
+					cc.lStructSize = sizeof(cc);
+					COLORREF cust_colors[16] = { 0 };
+					cc.lpCustColors = cust_colors;
+
+					if (ChooseColor(&cc)) {
+						colorFill = cc.rgbResult;
+						hBrush = CreateSolidBrush(colorFill);
+						isFill = TRUE;
+
+					}
+					break;
+				}
 			}
 
 			break;
@@ -357,7 +505,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		case WM_DESTROY: 
 		{
-			// команда Закрыть окно
 			DeleteObject(memBM);
 			PostQuitMessage(0);
 			return 0;
@@ -368,9 +515,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		{
 			OutputDebugStringW(L"LBUTTONDOWN\n");
 
-			// Захватываем мышку.
-			//SetCapture(hWnd);
 			hdc = GetDC(hwnd);
+			SelectObject(hdc, hPen);
+			SelectObject(memDC, hPen);
 			if ((currentId == ID_CURVE && !flag))
 			{
 				ptsBegin = MAKEPOINTS(lParam);
@@ -386,8 +533,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			{
 				ptsBegin = MAKEPOINTS(lParam);
 			}
-			//SetPixel(memDC, ptsBegin.x, ptsBegin.y, 0);
-			//SetPixel(hdc, ptsBegin.x, ptsBegin.y, 0);
 			break;
 		}
 
@@ -395,8 +540,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		{
 			OutputDebugStringW(L"RBUTTONDOWN\n");
 
-			// Захватываем мышку.
-			//SetCapture(hWnd);
 			hdc = GetDC(hwnd);
 			if (currentId == ID_CURVE)
 			{
@@ -409,13 +552,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				firstLine = TRUE;
 				SendMessage(hwnd, WM_LBUTTONUP, wParam, lParam);
 			}
-			//SetPixel(memDC, ptsBegin.x, ptsBegin.y, 0);
-			//SetPixel(hdc, ptsBegin.x, ptsBegin.y, 0);
 			break;
 		}
 
 		case WM_MOUSEMOVE:
 		{
+			SelectObject(hdc, hPen);
+			SelectObject(memDC, hPen);
+
 			switch (currentId)
 			{
 				case ID_PENCIL:
@@ -423,6 +567,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					if (wParam & MK_LBUTTON)
 					{
 						hdc = GetDC(hwnd);
+						SelectObject(hdc, hPen);
 						ptsEnd = MAKEPOINTS(lParam);
 						painter.drawPencil(hdc, memDC, ptsBegin, ptsEnd, zoom);
 						fPrevLine = TRUE;
@@ -436,6 +581,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					if (wParam & MK_LBUTTON)
 					{
 						hdc = GetDC(hwnd);
+						SelectObject(hdc, hPen);
 						painter.drawLine(hdc, memDC, ptsBegin, &ptsEnd, zoom, fPrevLine, lParam);
 						fPrevLine = TRUE;
 						ReleaseDC(hwnd, hdc);
@@ -447,7 +593,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					if (wParam & MK_LBUTTON)
 					{
 						hdc = GetDC(hwnd);
-						painter.drawRectangle(hdc, memDC, ptsBegin, &ptsEnd, zoom, fPrevLine, lParam);
+						SelectObject(hdc, hPen);
+						if (isFill)
+							SelectObject(hdc, hBrush);
+						painter.drawRectangle(hdc, memDC, ptsBegin, &ptsEnd, zoom, fPrevLine, lParam, isFill);
 						fPrevLine = TRUE;
 						ReleaseDC(hwnd, hdc);
 					}
@@ -458,7 +607,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					if (wParam & MK_LBUTTON)
 					{
 						hdc = GetDC(hwnd);
-						painter.drawEllipse(hdc, memDC, ptsBegin, &ptsEnd, zoom, fPrevLine, lParam);
+						SelectObject(hdc, hPen);
+						if(isFill)
+							SelectObject(hdc, hBrush);
+						painter.drawEllipse(hdc, memDC, ptsBegin, &ptsEnd, zoom, fPrevLine, lParam, isFill);
 						fPrevLine = TRUE;
 						ReleaseDC(hwnd, hdc);
 					}
@@ -469,6 +621,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					if (flag)
 					{
 						hdc = GetDC(hwnd);
+						SelectObject(hdc, hPen);
 						painter.drawCurve(hdc, memDC, ptsBegin, &ptsEnd, zoom, fPrevLine, lParam);
 						fPrevLine = TRUE;
 						ReleaseDC(hwnd, hdc);
@@ -481,6 +634,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					if (flagPoly)
 					{
 						hdc = GetDC(hwnd); 
+						SelectObject(hdc, hPen);
+						SelectObject(hdc, hBrush);
 						painter.drawPoly(hdc, memDC, ptsBegin, &ptsEnd, startPointPoly, zoom, fPrevLine, lParam);
 						fPrevLine = TRUE;
 						ReleaseDC(hwnd, hdc);
@@ -501,27 +656,36 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				ptsEnd = MAKEPOINTS(lParam);
 				MoveToEx(memDC, ptsBegin.x / zoom, ptsBegin.y / zoom, (LPPOINT)NULL);
 				LineTo(memDC, ptsEnd.x / zoom, ptsEnd.y / zoom);
-				/*StretchBlt(hdc, 0, 0, GetDeviceCaps(hdc, HORZRES)*zoom,
-					GetDeviceCaps(hdc, VERTRES)*zoom, memDC, 0, 0,
-					GetDeviceCaps(hdc, HORZRES), GetDeviceCaps(hdc, VERTRES), SRCCOPY);*/
 			}
 			else if (currentId == ID_RECT)
 			{
-				SelectObject(memDC, GetStockObject(NULL_BRUSH));
-				ptsEnd = MAKEPOINTS(lParam);
-				Rectangle(memDC, ptsBegin.x/zoom, ptsBegin.y / zoom, ptsEnd.x / zoom, ptsEnd.y / zoom);
-				/*StretchBlt(hdc, 0, 0, GetDeviceCaps(hdc, HORZRES)*zoom,
-					GetDeviceCaps(hdc, VERTRES)*zoom, memDC, 0, 0,
-					GetDeviceCaps(hdc, HORZRES), GetDeviceCaps(hdc, VERTRES), SRCCOPY);*/
+				if (!isPrint)
+				{
+					if (!isFill)
+						SelectObject(memDC, GetStockObject(NULL_BRUSH));
+					else
+						SelectObject(memDC, hBrush);
+					ptsEnd = MAKEPOINTS(lParam);
+					Rectangle(memDC, ptsBegin.x / zoom, ptsBegin.y / zoom, ptsEnd.x / zoom, ptsEnd.y / zoom);
+				}
+				else
+				{
+					SetROP2(hdc, R2_NOTXORPEN); //R2_NOTXORPEN
+					ptsEnd = MAKEPOINTS(lParam);
+					Rectangle(hdc, ptsBegin.x / zoom, ptsBegin.y / zoom, ptsEnd.x / zoom, ptsEnd.y / zoom);
+
+					SetROP2(hdc, R2_COPYPEN); 
+					SendMessage(hwnd, WM_COMMAND, ID_PRINT_FILE, 0);
+				}
 			}
 			else if (currentId == ID_ELLIPSE)
 			{
-				SelectObject(memDC, GetStockObject(NULL_BRUSH));
+				if (!isFill)
+					SelectObject(memDC, GetStockObject(NULL_BRUSH));
+				else
+					SelectObject(memDC, hBrush);
 				ptsEnd = MAKEPOINTS(lParam);
 				Ellipse(memDC, ptsBegin.x / zoom, ptsBegin.y / zoom, ptsEnd.x / zoom, ptsEnd.y / zoom);
-				/*StretchBlt(hdc, 0, 0, GetDeviceCaps(hdc, HORZRES)*zoom,
-					GetDeviceCaps(hdc, VERTRES)*zoom, memDC, 0, 0,
-					GetDeviceCaps(hdc, HORZRES), GetDeviceCaps(hdc, VERTRES), SRCCOPY);*/
 			}
 			else if (currentId == ID_CURVE)
 			{
@@ -529,9 +693,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				ptsEnd = MAKEPOINTS(lParam);
 				MoveToEx(memDC, ptsBegin.x / zoom, ptsBegin.y / zoom, (LPPOINT)NULL);
 				LineTo(memDC, ptsEnd.x / zoom, ptsEnd.y / zoom);
-				/*StretchBlt(hdc, 0, 0, GetDeviceCaps(hdc, HORZRES)*zoom,
-					GetDeviceCaps(hdc, VERTRES)*zoom, memDC, 0, 0,
-					GetDeviceCaps(hdc, HORZRES), GetDeviceCaps(hdc, VERTRES), SRCCOPY);*/
 				ptsBegin = ptsEnd;
 
 			}
@@ -539,6 +700,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			{
 				fPrevLine = FALSE;
 				ptsEnd = MAKEPOINTS(lParam);
+				if (!isFill)
+					SelectObject(memDC, GetStockObject(NULL_BRUSH));
+				else
+					SelectObject(memDC, hBrush);
 				if (firstLine)
 				{
 					MoveToEx(memDC, startPointPoly.x / zoom, startPointPoly.y / zoom, (LPPOINT)NULL);
@@ -547,9 +712,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				}
 				MoveToEx(memDC, ptsBegin.x / zoom, ptsBegin.y / zoom, (LPPOINT)NULL);
 				LineTo(memDC, ptsEnd.x / zoom, ptsEnd.y / zoom);
-				/*StretchBlt(hdc, 0, 0, GetDeviceCaps(hdc, HORZRES)*zoom,
-				GetDeviceCaps(hdc, VERTRES)*zoom, memDC, 0, 0,
-				GetDeviceCaps(hdc, HORZRES), GetDeviceCaps(hdc, VERTRES), SRCCOPY);*/
 				ptsBegin = ptsEnd;
 			}
 			fPrevLine = FALSE;
@@ -565,8 +727,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			hdc = GetDC(hwnd);
 			if (currentId == ID_TEXT)
 			{
+				SelectObject(memDC, hfont);
 				TextOut(memDC, ptsBegin.x, ptsBegin.y, (LPCWSTR)text, sizeof(text));
-				ptsBegin.x += 9;
+				ptsBegin.x += 8;
 			}
 			StretchBlt(hdc, 0, 0, GetDeviceCaps(hdc, HORZRES)*zoom,
 				GetDeviceCaps(hdc, VERTRES)*zoom, memDC, 0, 0,
@@ -583,14 +746,56 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				if (((short)HIWORD(wParam)) < 0)
 				{
 					zoom -= 0.05;
+					if (zoom == 1)
+						painter.hideScrollBar(hwnd);
 					SendMessage(hwnd, WM_PAINT, 0, 0);
 				}
 				else
 				{
-					zoom += 0.05;
+					zoom += 0.05; POINT lp;
+					RECT rect; GetDCOrgEx(hdc, &lp);
+					GetWindowRect(hwnd, &rect);
+					HBITMAP hbm = (HBITMAP)GetCurrentObject(memDC, OBJ_BITMAP);
+					BITMAP bm;
+					GetObject(hbm, sizeof(bm), (LPVOID)&bm);
+					int widht = bm.bmWidth; //ширина картинки в 
+					int height = bm.bmHeight;//высота картинки
+					
+					if (zoom <= 1)
+						painter.hideScrollBar(hwnd);
+					else
+					{
+						painter.scrollBarSetParams(hwnd, zoom);
+						painter.showScrollBar(hwnd);
+					}
 					SendMessage(hwnd, WM_PAINT, 0, 0);
 				}
 			}
+			else
+			{
+
+			}
+			break;
+		}
+
+		case WM_DROPFILES:
+		{
+			hdc = GetDC(hwnd);
+			static HDROP hdrop;
+			RegisterDragDrop(hwnd, (LPDROPTARGET)hdrop);
+
+			OnDropFiles(hwnd, hdrop);
+			/*DragQueryFile(hdrop, 0, openFileName, 16);
+			HENHMETAFILE hemf = GetEnhMetaFile(openFileName);
+			RECT rect;
+			GetClientRect(hwnd, &rect);
+			PlayEnhMetaFile(hdc, hemf, &rect);
+			//EnumEnhMetaFile(hdc, hemf, EnhMetaFileProc, NULL, &rect);
+			StretchBlt(memDC, 0, 0, GetDeviceCaps(hdc, HORZRES),
+				GetDeviceCaps(hdc, VERTRES), hdc, 0, 0,
+				GetDeviceCaps(memDC, HORZRES), GetDeviceCaps(memDC, VERTRES), SRCCOPY);
+			DeleteEnhMetaFile(hemf);*/
+			ReleaseDC(hwnd, hdc);
 			break;
 		}
 
