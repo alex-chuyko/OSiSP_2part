@@ -5,7 +5,7 @@
 #define SelectPen(hdc, hpen) \
   ((HPEN)SelectObject((hdc), (HGDIOBJ)(HPEN)(hpen)))
 
-#define ID_NEW_FILE 1000
+#define ID_OPEN_FILE 1000
 #define ID_SAVE_FILE 1001
 #define ID_SAVE_AS_FILE 1002
 #define ID_PRINT_FILE 1003
@@ -17,12 +17,13 @@
 #define ID_CURVE 1009
 #define ID_POLY 1010
 #define ID_TEXT 1011
+#define ID_ABOUT 1
 
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 int currentId = 0;
 bool flag = FALSE, flagPoly = FALSE, firstLine = TRUE;
-bool flagMouseClick = false;
+LPWSTR openFileName;
 double zoom = 1;
 Painter painter;
 POINTS startPointPoly;
@@ -60,7 +61,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	AppendMenu(MainMenu, MF_STRING | MF_POPUP, (UINT)hPopupMenu1, L"File");
 	{
-		AppendMenu(hPopupMenu1, MF_STRING, ID_NEW_FILE, L"New");
+		AppendMenu(hPopupMenu1, MF_STRING, ID_OPEN_FILE, L"Open file...");
 		AppendMenu(hPopupMenu1, MF_STRING, ID_SAVE_FILE, L"Save");
 		AppendMenu(hPopupMenu1, MF_STRING, ID_SAVE_AS_FILE, L"Save as...");
 		AppendMenu(hPopupMenu1, MF_STRING, ID_PRINT_FILE, L"Print");
@@ -76,14 +77,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		AppendMenu(hPopupMenu2, MF_STRING, ID_POLY, L"Poly");
 		AppendMenu(hPopupMenu2, MF_STRING, ID_TEXT, L"Text");
 	}
-	AppendMenu(MainMenu, MF_STRING, 0, L"About");
+	AppendMenu(MainMenu, MF_STRING, ID_ABOUT, L"About");
 
 	HWND hWindow = CreateWindowEx(NULL,
 		L"My Window Class", 
 		L"Mini Paint", 
 		WS_OVERLAPPEDWINDOW,
-		300, 
-		200, 
+		500, 
+		250, 
 		640, 
 		480, 
 		NULL,
@@ -95,35 +96,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	HWND s1 = CreateWindowEx(0, L"SCROLLBAR", NULL, WS_CHILD | WS_VISIBLE | SBS_VERT, rect.right-15, 0, 15, rect.bottom, hWindow, NULL, hInstance, NULL);
 	HWND s2 = CreateWindowEx(0, L"SCROLLBAR", NULL, WS_CHILD | WS_VISIBLE | SBS_HORZ, 0, rect.bottom-15, rect.right-15, 15, hWindow, NULL, hInstance, NULL);*/
 
-	/*HWND hWnd_buttonLine = CreateWindow(L"button", L"Прямая", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-		10, 10, 80, 30, hWindow, (HMENU)1, hInstance, NULL);
-
-	HWND hWnd_buttonPen = CreateWindow(L"button", L"Карандаш", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-		10, 50, 80, 30, hWindow, (HMENU)2, hInstance, NULL);
-
-	HWND hWnd_buttonRectangle = CreateWindow(L"button", L"Прямоугольник", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-		10, 100, 80, 30, hWindow, (HMENU)3, hInstance, NULL);
-
-	HWND hWnd_buttonEllipce = CreateWindow(L"button", L"Эллипс", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-		10, 150, 80, 30, hWindow, (HMENU)4, hInstance, NULL);*/
-
 	if (!hWindow)
 	{
 		int nResult = GetLastError();
 		MessageBox(NULL, L"Окно не было создано!", L"Ошибка", MB_ICONERROR);
 	}
 
-	// Показываем окно
 	ShowWindow(hWindow, nShowCmd);
 
 	UpdateWindow(hWindow);
 
-	// Объявляем переменную для сообщений типа MSG
 	MSG msg;
-	// Обнуляем память по размеру структуры MSG
 	ZeroMemory(&msg, sizeof(MSG));
 
-	// Цикл обработки сообщений
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
 		TranslateMessage(&msg);
@@ -133,7 +118,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	return 0;
 }
 
-// определяем процедуру обратного вызова (WinApi)
+
+int CALLBACK EnhMetaFileProc(HDC hdc, HANDLETABLE *pHandleTable, CONST ENHMETARECORD *pEMFRecord, int iHandles, LPARAM pData)
+{
+	if (pEMFRecord->iType != EMR_HEADER && pEMFRecord->iType != EMR_EOF)
+	{
+		PlayEnhMetaFileRecord(hdc, pHandleTable, pEMFRecord, iHandles);
+	}
+
+	return TRUE;
+}
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -144,7 +138,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	HDC memDC = CreateCompatibleDC(hdc);*/
 
 	PAINTSTRUCT ps;
-	HDC hdc;		
+	static HDC hdc;		
 	static POINTS ptsBegin;		
 	static POINTS ptsEnd;			
 	static BOOL fPrevLine = FALSE;	
@@ -185,9 +179,110 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		{
 			switch (LOWORD(wParam))
 			{
-				case ID_NEW_FILE:
+				case ID_ABOUT:
 				{
+					MessageBox(hwnd, L"Mini Paint\nAlexandr Chuiko\n2016", L"About", MB_OK);
+					break;
+				}
+				case ID_SAVE_AS_FILE:
+				{
+					OPENFILENAME ofn;       // common dialog box structure
+					char szFile[260];       // buffer for file name
+					HANDLE hf;              // file handle
 
+											// Initialize OPENFILENAME
+					ZeroMemory(&ofn, sizeof(ofn));
+					ofn.lStructSize = sizeof(ofn);
+					ofn.hwndOwner = hwnd;
+					ofn.lpstrFile = (LPWSTR)szFile;
+					// Set lpstrFile[0] to '\0' so that GetOpenFileName does not 
+					// use the contents of szFile to initialize itself.
+					ofn.lpstrFile[0] = '\0';
+					ofn.nMaxFile = sizeof(szFile);
+					ofn.lpstrFilter = L"EMF\0*.emf\0";
+					ofn.nFilterIndex = 1;
+					ofn.lpstrFileTitle = NULL;
+					ofn.nMaxFileTitle = 0;
+					ofn.lpstrInitialDir = NULL;
+					ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+					// Display the Open dialog box. 
+
+					if (GetSaveFileName(&ofn) == TRUE)
+					{
+						hdc = GetDC(hwnd);
+
+						RECT rect;
+						GetClientRect(hwnd, &rect);
+						int iWidthMM = GetDeviceCaps(hdc, HORZSIZE);
+						int iHeightMM = GetDeviceCaps(hdc, VERTSIZE);
+						int iWidthPels = GetDeviceCaps(hdc, HORZRES);
+						int iHeightPels = GetDeviceCaps(hdc, VERTRES);
+						rect.left = (rect.left * iWidthMM * 100) / iWidthPels;
+						rect.top = (rect.top * iHeightMM * 100) / iHeightPels;
+						rect.right = (rect.right * iWidthMM * 100) / iWidthPels;
+						rect.bottom = (rect.bottom * iHeightMM * 100) / iHeightPels;
+						HDC hdcMeta = CreateEnhMetaFile(hdc, ofn.lpstrFile, &rect, L"Example metafile\0");
+						if (!hdcMeta)
+						{
+							MessageBox(NULL, L"CreateEnhMetaFile!", L"Error", MB_ICONERROR);
+						}
+						StretchBlt(hdcMeta, 0, 0, GetDeviceCaps(hdc, HORZRES),
+							GetDeviceCaps(hdc, VERTRES), memDC, 0, 0,
+							GetDeviceCaps(memDC, HORZRES), GetDeviceCaps(memDC, VERTRES), SRCCOPY);
+						SetMapMode(hdcMeta, MM_ANISOTROPIC);
+						ReleaseDC(hwnd, hdc);
+						HENHMETAFILE meta = CloseEnhMetaFile(hdcMeta);
+						ReleaseDC(hwnd, hdcMeta);
+					}
+					break;
+				}
+				case ID_OPEN_FILE:
+				{
+					hdc = GetDC(hwnd);
+					OPENFILENAME ofn;       // common dialog box structure
+					char szFile[260];       // buffer for file name
+					HANDLE hf;              // file handle
+
+											// Initialize OPENFILENAME
+					ZeroMemory(&ofn, sizeof(ofn));
+					ofn.lStructSize = sizeof(ofn);
+					ofn.hwndOwner = hwnd;
+					ofn.lpstrFile = (LPWSTR)szFile;
+					// Set lpstrFile[0] to '\0' so that GetOpenFileName does not 
+					// use the contents of szFile to initialize itself.
+					ofn.lpstrFile[0] = '\0';
+					ofn.nMaxFile = sizeof(szFile);
+					ofn.lpstrFilter = L"EMF\0*.emf\0";
+					ofn.nFilterIndex = 1;
+					ofn.lpstrFileTitle = NULL;
+					ofn.nMaxFileTitle = 0;
+					ofn.lpstrInitialDir = NULL;
+					ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+					// Display the Open dialog box. 
+
+					if (GetOpenFileName(&ofn) == TRUE)
+					{
+						/*hf = CreateFile(ofn.lpstrFile,
+							GENERIC_READ,
+							0,
+							(LPSECURITY_ATTRIBUTES)NULL,
+							OPEN_EXISTING,
+							FILE_ATTRIBUTE_NORMAL,
+							(HANDLE)NULL);*/
+						openFileName = ofn.lpstrFile;
+						HENHMETAFILE hemf = GetEnhMetaFile(ofn.lpstrFile);
+						RECT rect;
+						GetClientRect(hwnd, &rect);
+						PlayEnhMetaFile(hdc, hemf, &rect);
+						//EnumEnhMetaFile(hdc, hemf, EnhMetaFileProc, NULL, &rect);
+						StretchBlt(memDC, 0, 0, GetDeviceCaps(hdc, HORZRES),
+							GetDeviceCaps(hdc, VERTRES), hdc, 0, 0,
+							GetDeviceCaps(memDC, HORZRES), GetDeviceCaps(memDC, VERTRES), SRCCOPY);
+						DeleteEnhMetaFile(hemf);
+					}
+					ReleaseDC(hwnd, hdc);
 					break;
 				}
 				case ID_SAVE_FILE:
@@ -204,7 +299,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					rect.top = (rect.top * iHeightMM * 100) / iHeightPels;
 					rect.right = (rect.right * iWidthMM * 100) / iWidthPels;
 					rect.bottom = (rect.bottom * iHeightMM * 100) / iHeightPels;
-					HDC hdcMeta = CreateEnhMetaFile(hdc, L"D:\\testEMF.emf", &rect, L"Example metafile\0");
+					HDC hdcMeta = CreateEnhMetaFile(hdc, openFileName, &rect, L"Example metafile\0");
 					if (!hdcMeta)
 					{
 						MessageBox(NULL, L"CreateEnhMetaFile!", L"Error", MB_ICONERROR);
@@ -215,7 +310,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					SetMapMode(hdcMeta, MM_ANISOTROPIC);
 					ReleaseDC(hwnd, hdc);
 					HENHMETAFILE meta = CloseEnhMetaFile(hdcMeta);
-					//ReleaseDC(hwnd, hdcMeta);
+					ReleaseDC(hwnd, hdcMeta);
 					break;
 				}
 				case ID_PENCIL:
@@ -503,8 +598,27 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		{
 			if (currentId == ID_TEXT)
 			{
-				text[0] = (char)wParam;
-				SendMessage(hwnd, WM_PAINT, 0, 0);
+				switch (wParam)
+				{
+					case VK_HOME : case VK_END: case VK_PRIOR:
+					case VK_NEXT: case VK_LEFT: case VK_RIGHT:
+					case VK_DOWN: case VK_UP: case VK_DELETE:
+					case VK_SHIFT: case VK_CONTROL: case VK_CAPITAL:
+					case VK_MENU: case VK_TAB: case VK_RETURN:
+						break;
+					case VK_BACK:
+					{
+						text[0] = ' ';
+						ptsBegin.x -= 9;
+						SendMessage(hwnd, WM_PAINT, 0, 0);
+						break;
+					}
+					default:
+					{
+						text[0] = (char)wParam;
+						SendMessage(hwnd, WM_PAINT, 0, 0);
+					}
+				}
 			}
 			break;
 		}
