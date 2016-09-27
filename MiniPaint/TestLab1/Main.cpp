@@ -30,6 +30,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 int currentId = 0;
 bool flag = FALSE, flagPoly = FALSE, firstLine = TRUE, isFill = FALSE, isPrint = FALSE;
 LPCWSTR openFileName;
+int offsetX = 0, offsetY = 0;
 double zoom = 1;
 Painter painter;
 POINTS startPointPoly;
@@ -68,11 +69,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	AppendMenu(MainMenu, MF_STRING | MF_POPUP, (UINT)hPopupMenu1, L"File");
 	{
-		AppendMenu(hPopupMenu1, MF_STRING, ID_OPEN_FILE, L"Open file...");
-		AppendMenu(hPopupMenu1, MF_STRING, ID_SAVE_FILE, L"Save");
-		AppendMenu(hPopupMenu1, MF_STRING, ID_SAVE_AS_FILE, L"Save as...");
-		AppendMenu(hPopupMenu1, MF_STRING, ID_PRINT_FILE, L"Print");
-		AppendMenu(hPopupMenu1, MF_STRING, ID_EXIT, L"Exit");
+		AppendMenu(hPopupMenu1, MF_STRING, ID_OPEN_FILE, L"Open file...(Ctrl+O)");
+		//AppendMenu(hPopupMenu1, MF_STRING, ID_SAVE_FILE, L"Save");
+		AppendMenu(hPopupMenu1, MF_STRING, ID_SAVE_AS_FILE, L"Save as...(Ctrl+S)");
+		AppendMenu(hPopupMenu1, MF_STRING, ID_PRINT_FILE, L"Print(Ctrl+P)");
+		AppendMenu(hPopupMenu1, MF_STRING, ID_EXIT, L"Exit(Ctrl+W)");
 	}
 	AppendMenu(MainMenu, MF_STRING | MF_POPUP, (UINT)hPopupMenu2, L"Shape");
 	{
@@ -194,6 +195,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			font.lfOrientation = 0;
 			font.lfWeight = 100;
 			font.lfCharSet = RUSSIAN_CHARSET;
+			font.lfItalic = 0;
+			font.lfStrikeOut = 0;
+			font.lfUnderline = 0;
 			font.lfOutPrecision = 0;
 			font.lfClipPrecision = 0;
 			font.lfQuality = 100;
@@ -222,6 +226,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				case ID_ABOUT:
 				{
 					DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG1), hwnd, AboutProc);
+					break;
+				}
+				case ID_EXIT:
+				{
+					DestroyWindow(hwnd);
 					break;
 				}
 				case ID_SAVE_AS_FILE:
@@ -380,10 +389,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 							rect.top = (0 * iHeightMM * 100) / iHeightPels;
 							rect.right = (abs(ptsEnd.x - ptsBegin.x) * iWidthMM * 100) / iWidthPels;
 							rect.bottom = (abs(ptsEnd.y - ptsBegin.y) * iHeightMM * 100) / iHeightPels;
-							/*rect.left = 0;
-							rect.top = 0;
-							rect.bottom = abs(ptsEnd.y - ptsBegin.y);
-							rect.right = abs(ptsEnd.x - ptsBegin.x);*/
 							HDC hdcMeta = CreateEnhMetaFile(hdc, ofn.lpstrFile, &rect, L"Example metafile\0");
 							if (!hdcMeta)
 							{
@@ -732,11 +737,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				ptsBegin.x += 8;
 			}
 			StretchBlt(hdc, 0, 0, GetDeviceCaps(hdc, HORZRES)*zoom,
-				GetDeviceCaps(hdc, VERTRES)*zoom, memDC, 0, 0,
+				GetDeviceCaps(hdc, VERTRES)*zoom, memDC, offsetX, offsetY,
 				GetDeviceCaps(memDC, HORZRES), GetDeviceCaps(memDC, VERTRES), SRCCOPY);
 			ReleaseDC(hwnd, hdc);
 			break;
 		}
+
+
 
 		case WM_MOUSEWHEEL:
 		{
@@ -752,22 +759,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				}
 				else
 				{
-					zoom += 0.05; POINT lp;
-					RECT rect; GetDCOrgEx(hdc, &lp);
-					GetWindowRect(hwnd, &rect);
-					HBITMAP hbm = (HBITMAP)GetCurrentObject(memDC, OBJ_BITMAP);
-					BITMAP bm;
-					GetObject(hbm, sizeof(bm), (LPVOID)&bm);
-					int widht = bm.bmWidth; //ширина картинки в 
-					int height = bm.bmHeight;//высота картинки
-					
-					if (zoom <= 1)
+					zoom += 0.05;					
+					/*if (zoom <= 1)
 						painter.hideScrollBar(hwnd);
 					else
 					{
 						painter.scrollBarSetParams(hwnd, zoom);
 						painter.showScrollBar(hwnd);
-					}
+					}*/
 					SendMessage(hwnd, WM_PAINT, 0, 0);
 				}
 			}
@@ -822,6 +821,44 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					{
 						text[0] = (char)wParam;
 						SendMessage(hwnd, WM_PAINT, 0, 0);
+					}
+				}
+			}
+			else
+			{
+				switch (wParam)
+				{
+					case 'S':
+					{
+						if (GetAsyncKeyState(VK_CONTROL))
+						{
+							SendMessage(hwnd, WM_COMMAND, ID_SAVE_AS_FILE, 0);
+						}
+						break;
+					}
+					case 'O':
+					{
+						if (GetAsyncKeyState(VK_CONTROL))
+						{
+							SendMessage(hwnd, WM_COMMAND, ID_OPEN_FILE, 0);
+						}
+						break;
+					}
+					case 'W':
+					{
+						if (GetAsyncKeyState(VK_CONTROL))
+						{
+							SendMessage(hwnd, WM_COMMAND, ID_EXIT, 0);
+						}
+						break;
+					}
+					case 'P':
+					{
+						if (GetAsyncKeyState(VK_CONTROL))
+						{
+							SendMessage(hwnd, WM_COMMAND, ID_PRINT_FILE, 0);
+						}
+						break;
 					}
 				}
 			}

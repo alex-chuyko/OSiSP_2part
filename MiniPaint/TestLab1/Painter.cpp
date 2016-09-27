@@ -133,7 +133,7 @@ void Painter::scrollBarSetParams(HWND hwnd, double zoom)
 	scrollInfo.cbSize = sizeof(SCROLLINFO);
 	scrollInfo.fMask = SIF_ALL;
 	scrollInfo.nMin = 0;
-	scrollInfo.nMax = 1;
+	scrollInfo.nMax = 1*zoom;
 	scrollInfo.nPage = 1;
 	SetScrollInfo(hwnd, SB_VERT, &scrollInfo, TRUE);
 	SetScrollInfo(hwnd, SB_HORZ, &scrollInfo, TRUE);
