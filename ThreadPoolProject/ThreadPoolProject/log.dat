@@ -1,0 +1,116 @@
+2016-10-16 10:47:20 Message: Initialize the object threadpool with 2 threads
+2016-10-16 10:47:20 Message: It created a new task!
+2016-10-16 10:47:20 Message: It created a new task!
+2016-10-16 10:47:20 Error: It exceeded the maximum number of working threads!
+2016-10-16 10:51:10 Message: Initialize the object threadpool with 2 threads
+2016-10-16 10:51:10 Message: It created a new task!
+2016-10-16 10:51:10 Message: It created a new task!
+2016-10-16 10:51:10 Error: It exceeded the maximum number of working threads!
+2016-10-16 10:51:42 Message: Initialize the object threadpool with 2 threads
+2016-10-16 10:51:42 Message: It created a new task!
+2016-10-16 10:51:42 Message: It created a new task!
+2016-10-16 10:51:42 Error: It exceeded the maximum number of working threads!
+2016-10-16 10:51:42 Error: It exceeded the maximum number of working threads!
+2016-10-16 10:51:42 Error: It exceeded the maximum number of working threads!
+2016-10-16 10:52:07 Message: Initialize the object threadpool with 5 threads
+2016-10-16 10:52:07 Message: It created a new task!
+2016-10-16 10:52:07 Message: It created a new task!
+2016-10-16 10:52:07 Message: It created a new task!
+2016-10-16 10:52:07 Message: It created a new task!
+2016-10-16 10:52:07 Message: It created a new task!
+2016-10-16 10:57:34 Message: Initialize the object threadpool with 5 threads
+2016-10-16 10:57:34 Message: It created a new task!
+2016-10-16 10:57:34 Message: It created a new task!
+2016-10-16 10:57:34 Message: It created a new task!
+2016-10-16 10:57:34 Message: It created a new task!
+2016-10-16 10:57:34 Message: It created a new task!
+2016-10-16 10:57:44 Message: It created a new task!
+2016-10-16 10:58:33 Message: Initialize the object threadpool with 2 threads
+2016-10-16 10:58:33 Message: It created a new task!
+2016-10-16 10:58:33 Message: It created a new task!
+2016-10-16 10:58:33 Error: It exceeded the maximum number of working threads!
+2016-10-16 10:58:33 Error: It exceeded the maximum number of working threads!
+2016-10-16 10:58:33 Error: It exceeded the maximum number of working threads!
+2016-10-16 10:58:43 Message: It created a new task!
+2016-10-16 11:05:42 Warning: The minimum number of threads - 1
+2016-10-16 11:05:55 Warning: The minimum number of threads - 1
+2016-10-16 11:08:02 Warning: The minimum number of threads - 1
+2016-10-16 11:08:42 Warning: The minimum number of threads - 1
+2016-10-16 11:08:42 Error: It exceeded the maximum number of working threads!
+2016-10-16 11:09:04 Warning: The minimum number of threads - 1
+2016-10-16 11:09:04 Error: It exceeded the maximum number of working threads!
+2016-10-16 11:11:10 Message: Initialize the object threadpool with 2 threads
+2016-10-16 11:11:10 Thread:236 Message: It created a new task!
+2016-10-16 11:11:10 Thread:180 Message: It created a new task!
+2016-10-16 11:11:10 Error: It exceeded the maximum number of working threads!
+2016-10-16 11:11:10 Error: It exceeded the maximum number of working threads!
+2016-10-16 11:11:10 Error: It exceeded the maximum number of working threads!
+2016-10-16 11:11:10 Error: It exceeded the maximum number of working threads!
+2016-10-16 11:11:20 Thread:240 Message: It created a new task!
+2016-10-17 21:11:16 Message: Initialize the object threadpool with 2 threads
+2016-10-17 21:11:16 Thread:212 Message: It created a new task!
+2016-10-17 21:11:16 Thread:176 Message: It created a new task!
+2016-10-17 21:11:16 Error: It exceeded the maximum number of working threads!
+2016-10-17 21:11:16 Error: It exceeded the maximum number of working threads!
+2016-10-17 21:11:16 Error: It exceeded the maximum number of working threads!
+2016-10-17 21:11:16 Error: It exceeded the maximum number of working threads!
+2016-10-17 21:11:26 Thread:240 Message: It created a new task!
+2016-10-17 21:15:11 Message: Initialize the object threadpool with 2 threads
+2016-10-17 21:15:11 Thread:192 Message: It created a new task!
+2016-10-17 21:15:11 Thread:208 Message: It created a new task!
+2016-10-17 21:15:11 Error: It exceeded the maximum number of working threads!
+2016-10-17 21:15:11 Error: It exceeded the maximum number of working threads!
+2016-10-17 21:15:11 Error: It exceeded the maximum number of working threads!
+2016-10-17 21:15:11 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:12:10 Message: Initialize the object threadpool with 2 threads
+2016-10-18 10:12:10 Thread:188 Message: It created a new task!
+2016-10-18 10:12:10 Thread:200 Message: It created a new task!
+2016-10-18 10:12:10 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:12:10 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:12:10 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:12:10 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:12:15 Thread:204 Message: It created a new task!
+2016-10-18 10:12:15 Message: Threads Pool has been destroyed!
+2016-10-18 10:12:40 Message: Initialize the object threadpool with 2 threads
+2016-10-18 10:12:40 Thread:240 Message: It created a new task!
+2016-10-18 10:12:40 Thread:244 Message: It created a new task!
+2016-10-18 10:12:40 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:12:40 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:12:40 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:12:40 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:12:45 Thread:184 Message: It created a new task!
+2016-10-18 10:12:45 Message: Threads Pool has been destroyed!
+2016-10-18 10:13:03 Message: Initialize the object threadpool with 2 threads
+2016-10-18 10:13:03 Thread:204 Message: It created a new task!
+2016-10-18 10:13:03 Thread:208 Message: It created a new task!
+2016-10-18 10:13:03 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:13:03 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:13:03 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:13:03 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:13:08 Thread:212 Message: It created a new task!
+2016-10-18 10:13:08 Message: Threads Pool has been destroyed!
+2016-10-18 10:26:44 Message: Initialize the object threadpool with 2 threads
+2016-10-18 10:26:44 Thread:196 Message: It created a new task!
+2016-10-18 10:26:44 Thread:200 Message: It created a new task!
+2016-10-18 10:26:44 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:26:44 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:26:44 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:26:44 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:26:49 Thread:204 Message: It created a new task!
+2016-10-18 10:26:49 Message: Threads Pool has been destroyed!
+2016-10-18 10:26:58 Message: Initialize the object threadpool with 2 threads
+2016-10-18 10:26:58 Thread:204 Message: It created a new task!
+2016-10-18 10:26:58 Thread:208 Message: It created a new task!
+2016-10-18 10:26:58 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:26:58 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:26:58 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:26:58 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:28:20 Message: Initialize the object threadpool with 2 threads
+2016-10-18 10:28:20 Thread:212 Message: It created a new task!
+2016-10-18 10:28:20 Thread:204 Message: It created a new task!
+2016-10-18 10:28:20 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:28:20 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:28:20 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:28:20 Error: It exceeded the maximum number of working threads!
+2016-10-18 10:28:25 Thread:216 Message: It created a new task!
+2016-10-18 10:28:25 Message: Threads Pool has been destroyed!
